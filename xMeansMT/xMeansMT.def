@@ -1,0 +1,4 @@
+LIBRARY	xMeansMT
+EXPORT
+	ExecuteXMeans
+
