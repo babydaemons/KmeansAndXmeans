@@ -144,6 +144,7 @@
     <ClInclude Include="DataSet.h" />
     <ClInclude Include="KMeans.h" />
     <ClInclude Include="Vector.h" />
+    <ClInclude Include="XMeans.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="xMeansMT.def" />

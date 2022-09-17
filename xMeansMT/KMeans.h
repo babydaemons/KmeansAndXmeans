@@ -9,36 +9,37 @@
 
 class KMeans {
 public:
-	KMeans(DataSet& dataSet, Clusters& clusters, const Label label)
-		: K(static_cast<int>(clusters.size())), ROWS(dataSet.ROWS), x(dataSet), label(label), clusters(clusters), iteration(0)
+	KMeans(int k, int k0, DataSet& dataSet, Clusters& clusters, const Label target_label, bool verbose = false)
+		: K(k), ROWS(dataSet.ROWS), x(dataSet), target_label(target_label), clusters(clusters), iteration(0), cluster_changed(0), verbose(verbose)
 	{
 		omp_init_lock(&omp_lock);
 
-		std::random_device rnd;								// 非決定的な乱数生成器を生成
-		std::mt19937 mt(rnd());								// メルセンヌ・ツイスタの32ビット版、引数は初期シード値
-		std::uniform_int_distribution<> randK(0, K - 1);	// [0, K] 範囲の一様乱数
+		auto div = ROWS / K;
 		for (auto i = 0; i < ROWS; ++i) {
-			if (x[i].label == label) {
-				x[i].label = clusters[randK(mt)].label;
+			if (x[i].label == target_label) {
+				x[i].label = k0 + (((i % K) ^ (i / div)) % K);
 			}
 		}
 
-		prev_clusters = clusters;
+		clusters.resize(K);
+		for (auto i = 0; i < K; ++i) {
+			clusters[i].label = k0 + i;
+		}
+
 		for (auto i = 0; i < K; ++i) {
 			auto label1 = clusters[i].label;
 			clusters[i] = 0;
-			prev_clusters[i] = std::numeric_limits<double>::max();
 		}
 
 		UpdateClusterCenter();
 	}
 
-	void CalculateClusters() {
+	const Clusters& CalculateClusters() {
 		while (true) {
 			++iteration;
 			UpdateLabelIndex();
 
-			auto cluster_changed = 0;
+			cluster_changed = 0;
 			#pragma omp parallel for
 			for (auto i = 0; i < ROWS; ++i) {
 				if (std::find(clusters.begin(), clusters.end(), x[i].label) == clusters.end()) {
@@ -62,13 +63,14 @@ public:
 				x[i].label = new_label;
 			}
 
-			prev_clusters = clusters;
 			UpdateClusterCenter();
 
 			if (cluster_changed == 0) {
 				break;
 			}
 		}
+
+		return clusters;
 	}
 
 private:
@@ -76,9 +78,14 @@ private:
 		UpdateLabelIndex();
 
 		#pragma omp parallel for
+		for (int i = 0; i < K; ++i) {
+			clusters[i].Clear();
+		}
+
+		#pragma omp parallel for
 		for (auto i = 0; i < ROWS; ++i) {
 			auto label1 = x[i].label;
-			if (x[i].label != label && std::find(clusters.begin(), clusters.end(), label1) == clusters.end()) {
+			if (x[i].label != target_label && std::find(clusters.begin(), clusters.end(), label1) == clusters.end()) {
 				continue;
 			}
 			auto index = r[label1];
@@ -87,29 +94,30 @@ private:
 
 		#pragma omp parallel for
 		for (auto i = 0; i < K; ++i) {
-			clusters[i].Average();
+			clusters[i].Mean();
 		}
 
-#if 0
 		auto it1 = clusters.end();
-		auto it2 = prev_clusters.end();
 		for (auto i = 1; i <= K; ++i) {
 			if (clusters[K - i].Count() > 0) {
 				continue;
 			}
 			clusters.erase(it1 - i);
-			prev_clusters.erase(it2 - i);
 		}
-
 		K = static_cast<int>(clusters.size());
-#endif
+
+		if (verbose) {
+			std::cout << iteration << " iteration: " << cluster_changed << " vectors cluster changed" << std::endl;
+			for (auto i = 0; i < K; ++i) {
+				std::cout << clusters[i];
+			}
+		}
 	}
 
 	void UpdateLabelIndex() {
 		r.clear();
 		for (auto i = 0; i < K; ++i) {
 			auto label1 = clusters[i].label;
-			clusters[i].Clear();
 			r[label1] = i;
 		}
 	}
@@ -118,10 +126,11 @@ private:
 	int K;
 	const int ROWS;
 	DataSet& x;
-	const Label label;
+	const Label target_label;
 	Clusters& clusters;
-	Clusters prev_clusters;
 	std::map<Label, Label> r;
 	int iteration;
+	int cluster_changed;
+	bool verbose;
 	omp_lock_t omp_lock;
 };
