@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <iostream>
+#include <iomanip>
 #include <cmath>
 
 class Vector {
@@ -13,14 +14,29 @@ public:
 
 	Vector() : label(-1), x(COLUMNS) { }
 
+	void  Read(std::istream& istream) {
+		istream.read(reinterpret_cast<char*>(&(x[0])), Vector::COLUMNS * sizeof(double));
+		label = -1;
+	}
+
 	friend std::istream& operator>>(std::istream& istream, Vector& vector) {
-		istream.read(reinterpret_cast<char*>(&(vector.x[0])), Vector::COLUMNS * sizeof(double));
+		for (auto i = 0; i < COLUMNS; ++i) {
+			istream >> vector.x[i];
+		}
 		vector.label = -1;
 		return istream;
 	}
 
+	void Write(std::ostream& ostream) {
+		ostream.write(reinterpret_cast<const char*>(&(x[0])), Vector::COLUMNS * sizeof(double));
+	}
+
 	friend std::ostream& operator<<(std::ostream& ostream, Vector& vector) {
-		ostream.write(reinterpret_cast<const char*>(&(vector.x[0])), Vector::COLUMNS * sizeof(double));
+		ostream << std::fixed;
+		for (auto i = 0; i < COLUMNS; ++i) {
+			ostream << std::setprecision(8) << vector.x[i];
+			ostream << (i < COLUMNS - 1 ? '\t' : '\n');
+		}
 		return ostream;
 	}
 
