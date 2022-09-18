@@ -3,57 +3,105 @@
 
 class XMeans {
 public:
-	XMeans(DataSet& dataSet, Clusters& clusters, const Label target_label)
-		: ROWS(dataSet.ROWS), dataSet(dataSet), clusters(clusters), root_clusters(dataSet),label(0)
-	{
+	XMeans(DataSet& xx, Cluster& x, Clusters& clusters,double eps = 0.01, bool verbose = false)
+		: ROWS(xx.size()), xx(xx), x(x), clusters(clusters), root_clusters(xx),eps(eps), verbose(verbose) {
 		clusters.clear();
 
-		KMeans kmeans(K, 0, dataSet, root_clusters, target_label);
+		KMeans kmeans(K, x, root_clusters, eps, verbose);
 		kmeans.CalculateClusters();
-		label += 2;
-
-		Clusters children0(dataSet);
-		CalculateClusters(root_clusters[0], children0);
-		Clusters children1(dataSet);
-		CalculateClusters(root_clusters[1], children1);
 	}
 
 	static const int K = 2;
 
 	void CalculateClusters() {
+		Clusters children0(xx);
+		CalculateClusters(root_clusters[0], children0);
+		Clusters children1(xx);
+		CalculateClusters(root_clusters[1], children1);
 	}
 
 private:
-	void CalculateClusters(const Cluster& parent, Clusters& chlidren) {
-		Clusters children0(dataSet);
-		KMeans kmeans0(K, label++,  dataSet, children0, parent.label);
-		kmeans0.CalculateClusters();
+	void CalculateClusters(Cluster& parent, Clusters& chlidren) {
+		auto parent_error = parent.MeanDistance();
+		if (parent_error < eps) {
+			AddCluster(parent);
+			return;
+		}
 
-		if (parent.AverageDist() > children0[0].AverageDist() + children0[1].AverageDist()) {
-			if (children0[0].Count() > 1) {
-				Clusters children(dataSet);
-				CalculateClusters(children0[0], children);
+		Clusters child_pair(xx);
+		KMeans kmeans(K, parent, child_pair, eps, verbose);
+		kmeans.CalculateClusters();
+		if (child_pair.size() == 1) {
+			AddCluster(parent);
+			return;
+		}
+
+#if 1
+		auto child_error0 = child_pair[0].MeanDistance();
+		auto child_error1 = child_pair[1].MeanDistance();
+		auto child_error = child_error0 + child_error1;
+#else
+		auto parent_error = -parent.MeanDistance();
+		auto child_error0 = -child_pair[0].MeanDistance();
+		auto child_error1 = -child_pair[1].MeanDistance();
+#endif
+		bool divide = parent_error > child_error;
+		if (divide) {
+			if (child_pair[0].Count() > 1) {
+				Clusters children(xx);
+				CalculateClusters(child_pair[0], children);
 			}
 			else {
-				clusters.push_back(children0[0]);
+				AddCluster(child_pair[0]);
 			}
-			if (children0[1].Count() > 1) {
-				Clusters children(dataSet);
-				CalculateClusters(children0[1], children);
+			if (child_pair[1].Count() > 1) {
+				Clusters children(xx);
+				CalculateClusters(child_pair[1], children);
 			}
 			else {
-				clusters.push_back(children0[1]);
+				AddCluster(child_pair[1]);
 			}
 		}
 		else {
-			clusters.push_back(parent);
+			AddCluster(parent, child_pair);
 		}
 	}
 
+	void AddCluster(Cluster& parent, Clusters& child_pair) {
+		auto label0 = parent.label;
+		auto label1 = child_pair[0].label;
+		auto label2 = child_pair[1].label;
+
+#pragma omp parallel for
+		for (auto i = 0; i < ROWS; ++i) {
+			if (x[i].label == label1) {
+				x[i].label = label0;
+			}
+		}
+#pragma omp parallel for
+		for (auto i = 0; i < ROWS; ++i) {
+			if (x[i].label == label2) {
+				x[i].label = label0;
+			}
+		}
+		AddCluster(parent);
+	}
+
+	void AddCluster(Cluster& cluster) {
+		clusters.push_back(cluster);
+#if defined(_DEBUG)
+		std::cout << cluster;
+#else
+		std::cout << '.' << std::flush;
+#endif
+	}
+
 private:
-	const int ROWS;
-	DataSet& dataSet;
+	const size_t ROWS;
+	DataSet& xx;
+	Cluster& x;
 	Clusters& clusters;
 	Clusters root_clusters;
-	int label;
+	double eps;
+	bool verbose;
 };

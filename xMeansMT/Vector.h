@@ -4,37 +4,45 @@
 #include <iomanip>
 #include <cmath>
 
-class Vector {
+class Vector : public std::vector<double> {
 public:
-	static void Initialize(int colums, int excludes) {
+	static void Initialize(int colums, int excludes = 0) {
 		COLUMNS = colums;
 		EXCLUDES = excludes;
 		DIMENSION = colums - excludes;
 	}
 
-	Vector() : label(-1), x(COLUMNS) { }
+	Vector() : std::vector<double>(COLUMNS), index(-1), label(-1) { }
+
+	Vector(double x0) : std::vector<double>(COLUMNS), index(-1), label(-1) {
+		std::vector<double>& x(*this);
+		#pragma omp parallel for
+		for (auto i = 0; i < COLUMNS; ++i) {
+			x[i] = x0;
+		}
+	}
 
 	void  Read(std::istream& istream) {
+		std::vector<double>& x(*this);
 		istream.read(reinterpret_cast<char*>(&(x[0])), Vector::COLUMNS * sizeof(double));
-		label = -1;
 	}
 
 	friend std::istream& operator>>(std::istream& istream, Vector& vector) {
 		for (auto i = 0; i < COLUMNS; ++i) {
-			istream >> vector.x[i];
+			istream >> vector[i];
 		}
-		vector.label = -1;
 		return istream;
 	}
 
-	void Write(std::ostream& ostream) {
+	void Write(std::ostream& ostream) const {
+		const std::vector<double>& x(*this);
 		ostream.write(reinterpret_cast<const char*>(&(x[0])), Vector::COLUMNS * sizeof(double));
 	}
 
-	friend std::ostream& operator<<(std::ostream& ostream, Vector& vector) {
+	friend std::ostream& operator<<(std::ostream& ostream, const Vector& vector) {
 		ostream << std::fixed;
 		for (auto i = 0; i < COLUMNS; ++i) {
-			ostream << std::setprecision(8) << vector.x[i];
+			ostream << std::setprecision(8) << vector[i];
 			ostream << (i < COLUMNS - 1 ? '\t' : '\n');
 		}
 		return ostream;
@@ -43,7 +51,7 @@ public:
 	friend double Dist(const Vector& a, const Vector& b) {
 		double sum = 0;
 		for (int i = 0; i < Vector::DIMENSION; ++i) {
-			sum += (a[i] - b[i]) * (a[i] - b[i]);
+			sum += std::pow(a[i] - b[i], 2.0);
 		}
 		return std::sqrt(sum);
 	}
@@ -57,43 +65,55 @@ public:
 	}
 
 	Vector& operator+=(const Vector& a0) {
+		std::vector<double>& x(*this);
 		#pragma omp parallel for
-		for (int i = 0; i < Vector::COLUMNS; ++i) {
+		for (int i = 0; i < Vector::DIMENSION; ++i) {
 			x[i] += a0[i];
 		}
 		return *this;
 	}
 
-	Vector& operator/=(double d0) {
+	Vector& operator-=(const Vector& a0) {
+		std::vector<double>& x(*this);
 		#pragma omp parallel for
-		for (int i = 0; i < Vector::COLUMNS; ++i) {
-			x[i] /= d0;
+		for (int i = 0; i < Vector::DIMENSION; ++i) {
+			x[i] -= a0[i];
 		}
 		return *this;
 	}
 
-	Vector& operator=(double x0) {
+	Vector& operator/=(double x0) {
+		std::vector<double>& x(*this);
 		#pragma omp parallel for
-		for (auto i = 0; i < COLUMNS; ++i) {
-			x[i] = x0;
+		for (int i = 0; i < Vector::DIMENSION; ++i) {
+			x[i] /= x0;
 		}
 		return *this;
 	}
 
-	double operator[](int i) const {
-		return x[i];
+	Vector& operator/=(const Vector& x0) {
+		std::vector<double>& x(*this);
+		#pragma omp parallel for
+		for (int i = 0; i < Vector::DIMENSION; ++i) {
+			x[i] /= x0[i];
+		}
+		return *this;
 	}
 
-	double& operator[](int i) {
-		return x[i];
+	Vector& operator*=(const Vector& x0) {
+		std::vector<double>& x(*this);
+		#pragma omp parallel for
+		for (int i = 0; i < Vector::DIMENSION; ++i) {
+			x[i] *= x0[i];
+		}
+		return *this;
 	}
 
 public:
+	int index;
 	int label;
 
-private:
-	std::vector<double> x;
-
+public:
 	static int COLUMNS;
 	static int EXCLUDES;
 	static int DIMENSION;

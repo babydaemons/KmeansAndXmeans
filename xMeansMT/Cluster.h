@@ -1,30 +1,89 @@
 #pragma once
-#include "Vector.h"
+#include "DataSet.h"
+
+//#define GEOMETRIC_MEAN
+
+#if defined(GEOMETRIC_MEAN)
+const double INIT_TOTAL = 1.0;
+#else
+const double INIT_TOTAL = 0.0;
+#endif
 
 typedef int Label;
-typedef std::vector<Label> Labels;
 
-class Cluster : public Vector {
+class Cluster;
+
+class Clusters : public std::vector<Cluster> {
 public:
-	Cluster(Label label = -1) : a(*static_cast<Vector*>(this)), count(0), total_dist(0) {
-		a = 0.0;
-		this->label = label;
+	Clusters(DataSet& dataSet) {
+		Clusters::clusters = this;
+		Clusters::dataSet = &dataSet;
+	}
+
+	Clusters& operator=(const Clusters& a) {
+		*static_cast<std::vector<Cluster>*>(this) = *static_cast<const std::vector<Cluster>*>(&a);
+		return *this;
+	}
+
+	void Clear(int K);
+
+	void Mean();
+
+	static Clusters& GetInstance() {
+		return *clusters;
+	}
+
+	static DataSet& GetDataSet() {
+		return *dataSet;
+	}
+
+public:
+	static Label label;
+
+private:
+	static Clusters* clusters;
+	static DataSet* dataSet;
+};
+
+Label Clusters::label;
+Clusters* Clusters::clusters;
+DataSet* Clusters::dataSet;
+
+class Cluster : private std::vector<Vector*> {
+public:
+	Cluster() : label(Clusters::label++), total_x(0.0), x(0.0), total_dist(INIT_TOTAL), mean_dist(INIT_TOTAL) {
+		omp_init_lock(&omp_lock);
+	}
+
+	void Fill() {
+		std::vector<Vector*>& ptr(*this);
+		auto& xx(Clusters::GetDataSet());
+
+		auto count = static_cast<int>(xx.size());
+		ptr.resize(count);
+
+		#pragma omp parallel for
+		for (auto i = 0; i < count; ++i) {
+			ptr[i] = &xx[i];
+		}
 	}
 
 	Cluster& operator=(const double b) {
-		a = b;
+		x = b;
 		return *this;
 	}
 
-	Cluster& operator=(const Cluster& b) {
-		a = *static_cast<const Vector*>(&b);
-		return *this;
-	}
-
-	Cluster& operator+=(const Vector& b) {
-		a += b;
-		++count;
-		total_dist += Dist(a, b);
+	Cluster& operator+=(Vector& a) {
+		omp_set_lock(&omp_lock);
+		total_x += a;
+#if defined(GEOMETRIC_MEAN)
+		total_dist += std::log(Dist(x, a));
+#else
+		total_dist += Dist(x, a);
+#endif
+		push_back(&a);
+		omp_unset_lock(&omp_lock);
+		a.label = label;
 		return *this;
 	}
 
@@ -32,40 +91,128 @@ public:
 		return this->label == label;
 	}
 
-	Cluster& Mean() {
-		a /= count;
-		return *this;
+	void Mean() {
+#if defined(GEOMETRIC_MEAN)
+		mean_dist = std::exp(total_dist / static_cast<int>(size()));
+#else
+		mean_dist = total_dist / static_cast<int>(size());
+#endif
+		x = total_x;
+		x /= static_cast<int>(size());
 	}
 
 	int Count() const {
-		return count;
+		return static_cast<int>(size());
 	}
 
-	double AverageDist() const {
-		return total_dist / count;
+	double BIC() const {
+		auto& clusters(Clusters::GetInstance());
+		const auto K = clusters.size();
+		auto& xx(Clusters::GetDataSet());
+		const auto ROWS = xx.size();
+		auto score = std::numeric_limits<double>::max();
+		auto dimension = (double)x.size();
+		auto sigma = total_dist;
+		auto N = 0.0;
+
+		for (auto i = 0; i < K; i++) {
+			N += static_cast<double>(clusters[i].Count());
+		}
+
+		if (N != K) {
+			std::vector<double> scores(K, 0.0);
+
+			sigma /= N - K;
+			auto p = (K - 1) + dimension * K + 1;
+
+			/* splitting criterion */
+			const double PI = 3.1415926535897932384626433832795028841971;
+			for (auto i = 0; i < K; ++i) {
+				double n = (double)clusters[i].Count();
+				double L = n * std::log(n) - n * std::log(N) - n * std::log(2.0 * PI) / 2.0 - n * dimension * std::log(sigma) / 2.0 - (n - K) / 2.0;
+
+				scores[i] = L - p * 0.5 * std::log(N);
+			}
+
+			score = std::accumulate(scores.begin(), scores.end(), 0.0);
+		}
+
+		return score;
+	}
+
+	double MeanDistance() {
+#if defined(GEOMETRIC_MEAN)
+		mean_dist = std::exp(total_dist / count);
+#else
+		mean_dist = total_dist / static_cast<int>(size());
+#endif
+		return mean_dist;
 	}
 
 	void Clear() {
-		a = 0.0;
-		count = 0;
-		total_dist = 0.0;
+		clear();
+		total_x = 0.0;
+		x = 0.0;
+		total_dist = INIT_TOTAL;
+		mean_dist = INIT_TOTAL;
 	}
 
-private:
-	Vector& a;
-	int count;
-	double total_dist;
-};
+	const Vector& Center() const {
+		return x;
+	}
 
-class Clusters : public std::vector<Cluster> {
+	const Vector& operator[](int i) const {
+		const std::vector<Vector*>& ptr(*this);
+		return *(ptr[i]);
+	}
+
+	Vector& operator[](int i) {
+		std::vector<Vector*>& ptr(*this);
+		return *(ptr[i]);
+	}
+
+	friend std::ostream& operator<<(std::ostream& ostream, const Cluster& cluster) {
+		ostream << cluster.label << '\t' << cluster.mean_dist << '\t' << cluster.size() << '\t' << cluster.x;
+		return ostream;
+	}
+
 public:
-	Clusters(DataSet& dataSet) : dataSet(dataSet) { }
-
-	Clusters& operator=(const Clusters& a) {
-		*static_cast<std::vector<Cluster>*>(this) = *static_cast<const std::vector<Cluster>*>(&a);
-		return *this;
-	}
+	Label label;
 
 private:
-	DataSet& dataSet;
+	Vector total_x;
+	Vector x;
+	double total_dist;
+	double mean_dist;
+	omp_lock_t omp_lock;
 };
+
+void Clusters::Clear(int K) {
+	Clusters& clusters(*this);
+	if (clusters.size() != K) {
+		clusters.resize(K);
+	}
+	for (auto i = 0; i < K; ++i) {
+		clusters[i].Clear();
+		clusters[i].label = i;
+	}
+}
+
+void Clusters::Mean() {
+	auto K = static_cast<int>(size());
+	std::vector<Cluster>& clusters(*this);
+
+	#pragma omp parallel for
+	for (auto i = 0; i < K; ++i) {
+		clusters[i].Mean();
+	}
+}
+
+std::ostream& operator<<(std::ostream& ostream, const Clusters& x) {
+	ostream << "========== clusters infomation ==========" << std::endl;
+	for (auto i = 0; i < x.size(); ++i) {
+		ostream << x[i];
+	}
+	ostream << "========== clusters infomation ==========" << std::endl;
+	return ostream;
+}
