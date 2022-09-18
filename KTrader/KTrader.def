@@ -1,0 +1,7 @@
+LIBRARY   KTrader
+EXPORTS
+	KTraderInitialize
+	KTraderClear
+	KTraderAppend
+	KTraderClustering
+	KTraderFetch
