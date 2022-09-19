@@ -50,14 +50,6 @@ public:
 		return std::sqrt(sum);
 	}
 
-	friend double Norm(const Vector& a) {
-		double sum = 0;
-		for (int i = 0; i < DIMENSION; ++i) {
-			sum += a[i] * a[i];
-		}
-		return std::sqrt(sum);
-	}
-
 	Vector& operator+=(const Vector& a0) {
 		std::vector<double>& x(*this);
 		#pragma omp parallel for

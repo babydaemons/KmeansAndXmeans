@@ -58,13 +58,13 @@ public:
 
 	void Write(std::ostream& ostream) {
 		std::vector<Cluster>& x(*this);
-		for (auto i = 0; i < x.size(); ++i) {
+		for (size_t i = 0; i < x.size(); ++i) {
 			x[i].Write(ostream);
 		}
 	}
 
 	friend std::ostream& operator<<(std::ostream& ostream, Clusters& xx) {
-		for (auto i = 0; i < xx.size(); ++i) {
+		for (size_t i = 0; i < xx.size(); ++i) {
 			ostream << xx[i];
 		}
 		return ostream;

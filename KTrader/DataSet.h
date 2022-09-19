@@ -7,7 +7,7 @@ public:
 	DataSet() {	}
 
 	void Read(std::istream& istream) {
-		for (auto i = 0; !istream.eof(); ++i) {
+		while (!istream.eof()) {
 			Vector a;
 			a.Read(istream);
 			push_back(a);
@@ -15,7 +15,7 @@ public:
 	}
 
 	friend std::istream& operator>>(std::istream& istream, DataSet& xx) {
-		for (auto i = 0; !istream.eof(); ++i) {
+		while (!istream.eof()) {
 			Vector a;
 			istream >> a;
 			xx.push_back(a);
