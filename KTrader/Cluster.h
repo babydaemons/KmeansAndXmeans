@@ -42,6 +42,9 @@ public:
 		count = 0;
 	}
 
+public:
+	int label;
+
 private:
 	int count;
 	Vector total_center;

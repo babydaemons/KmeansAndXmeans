@@ -97,6 +97,12 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
+#if defined(_DEBUG)
+	fprintf(stderr, "#### please attach from debugger, and type [Enter] key...");
+	char line[1024] = "";
+	fgets(line, sizeof(line), stdin);
+#endif
+
 	const int K = atoi(argv[1]);
 	const int columns = atoi(argv[2]);
 	const int exclude = atoi(argv[3]);

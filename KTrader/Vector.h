@@ -4,6 +4,17 @@
 #include <iomanip>
 #include <cmath>
 
+void Check(double x) {
+#if defined(__NUMERIC_DEBUG)
+	if (isinf(x)) {
+		std::cerr << "ERROR: Inf detected!" << std::endl;
+	}
+	if (isnan(x)) {
+		std::cerr << "ERROR: NaN detected!" << std::endl;
+	}
+#endif
+}
+
 class Vector : public std::vector<double> {
 public:
 	static void Initialize(int colums, int excludes) {
@@ -12,19 +23,17 @@ public:
 		DIMENSION = colums - excludes;
 	}
 
-	Vector() : std::vector<double>(COLUMNS), label(-1) { }
+	Vector() : std::vector<double>(COLUMNS) { }
 
 	void  Read(std::istream& istream) {
 		std::vector<double>& x(*this);
 		istream.read(reinterpret_cast<char*>(&(x[0])), Vector::COLUMNS * sizeof(double));
-		label = -1;
 	}
 
 	friend std::istream& operator>>(std::istream& istream, Vector& vector) {
 		for (auto i = 0; i < COLUMNS; ++i) {
 			istream >> vector[i];
 		}
-		vector.label = -1;
 		return istream;
 	}
 
@@ -45,6 +54,8 @@ public:
 	friend double Dist(const Vector& a, const Vector& b) {
 		double sum = 0;
 		for (int i = 0; i < DIMENSION; ++i) {
+			Check(a[i]);
+			Check(b[i]);
 			sum += (a[i] - b[i]) * (a[i] - b[i]);
 		}
 		return std::sqrt(sum);
@@ -54,6 +65,8 @@ public:
 		std::vector<double>& x(*this);
 		#pragma omp parallel for
 		for (int i = 0; i < COLUMNS; ++i) {
+			Check(x[i]);
+			Check(a0[i]);
 			x[i] += a0[i];
 		}
 		return *this;
@@ -64,6 +77,7 @@ public:
 		#pragma omp parallel for
 		for (int i = 0; i < COLUMNS; ++i) {
 			x[i] /= d0;
+			Check(x[i]);
 		}
 		return *this;
 	}
@@ -73,12 +87,10 @@ public:
 		#pragma omp parallel for
 		for (auto i = 0; i < COLUMNS; ++i) {
 			x[i] = x0;
+			Check(x[i]);
 		}
 		return *this;
 	}
-
-public:
-	int label;
 
 private:
 	static int COLUMNS;

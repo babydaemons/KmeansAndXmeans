@@ -29,8 +29,8 @@ Global
 		{3AC60E87-4EEC-4400-AD0A-9958A127D8BF}.DebugEXE|x64.Build.0 = DebugEXE|x64
 		{3AC60E87-4EEC-4400-AD0A-9958A127D8BF}.Release|x64.ActiveCfg = Release|x64
 		{3AC60E87-4EEC-4400-AD0A-9958A127D8BF}.Release|x64.Build.0 = Release|x64
-		{3AC60E87-4EEC-4400-AD0A-9958A127D8BF}.ReleaseEXE|x64.ActiveCfg = ReleaseEXE|Win32
-		{3AC60E87-4EEC-4400-AD0A-9958A127D8BF}.ReleaseEXE|x64.Build.0 = ReleaseEXE|Win32
+		{3AC60E87-4EEC-4400-AD0A-9958A127D8BF}.ReleaseEXE|x64.ActiveCfg = ReleaseEXE|x64
+		{3AC60E87-4EEC-4400-AD0A-9958A127D8BF}.ReleaseEXE|x64.Build.0 = ReleaseEXE|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
