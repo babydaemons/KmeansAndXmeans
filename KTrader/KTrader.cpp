@@ -43,7 +43,7 @@ int _stdcall KTraderClustering()
 #else
 	bool verbose = false;
 #endif
-	KMeans kmeans(K, xx, clusters, verbose);
+	KMeans kmeans(xx, clusters, verbose);
 	kmeans.CalculateClusters();
 
 	return static_cast<int>(clusters.size());
@@ -92,33 +92,28 @@ int main(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
-	if (argc != 6) {
-		std::cerr << "usage: " << argv[0] << " K columns exclude input_path output_path" << std::endl;
+	if (argc != 5) {
+		std::cerr << "usage: " << argv[0] << " columns exclude input_path output_path" << std::endl;
 		return -1;
 	}
 
-	const int K = atoi(argv[1]);
-	const int columns = atoi(argv[2]);
-	const int exclude = atoi(argv[3]);
+	const int columns = atoi(argv[1]);
+	const int exclude = atoi(argv[2]);
 	Vector::Initialize(columns, exclude);
 
-	clusters.clear();
-	xx.clear();
-
-	const char* input_path = argv[4];
+	const char* input_path = argv[3];
 	std::ifstream input(input_path, std::ios::binary);
 
-	const char* output_path = argv[5];
+	const char* output_path = argv[4];
 	std::ofstream output(output_path, std::ios::binary);
 
-	std::cout << "loading from " << input_path << std::endl;
+	std::cout << "loading from " << input_path << " ..." << std::flush;
 	xx.Read(input);
 	input.close();
-
-	clusters.clear();
+	std::cout << " done." << std::endl;
 
 	bool verbose = true;
-	KMeans kmeans(K, xx, clusters, verbose);
+	KMeans kmeans(xx, clusters, verbose);
 	kmeans.CalculateClusters();
 
 	std::cout << "saving to " << output_path << std::endl;

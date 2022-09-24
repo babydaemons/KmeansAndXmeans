@@ -8,8 +8,8 @@
 
 class KMeans {
 public:
-	KMeans(int k, DataSet& dataSet, Clusters& clusters, bool verbose = false)
-		: K(k), ROWS(static_cast<int>(dataSet.size())), x(dataSet), clusters(clusters), iteration(0), cluster_changed(0), max_cluster_changed(ROWS / 2048), verbose(verbose)
+	KMeans(DataSet& dataSet, Clusters& clusters, bool verbose = false)
+		: ROWS(static_cast<int>(dataSet.size())), K(ROWS / 64), x(dataSet), clusters(clusters), iteration(0), cluster_changed(0), max_cluster_changed(ROWS / 1024), verbose(verbose)
 	{
 		auto div = ROWS / K;
 		#pragma omp parallel for
@@ -53,9 +53,11 @@ public:
 			}
 		}
 
-		for (size_t i = 0; i < clusters.size(); ++i) {
-			if (clusters[i].Count() == 0) {
-				clusters.erase(clusters.begin() + i);
+		Clusters results(clusters);
+		clusters.clear();
+		for (size_t i = 0; i < results.size(); ++i) {
+			if (results[i].Count() > 0) {
+				clusters.push_back(results[i]);
 			}
 		}
 
@@ -79,11 +81,14 @@ private:
 		for (auto i = start; i < end; ++i) {
 			auto min_dist = std::numeric_limits<double>::max();
 			auto new_label_index = std::numeric_limits<int>::max();
-			for (auto j = 0; j < K; ++j) {
-				auto dist = Dist(clusters[j], x[i]);
+			for (auto k = 0; k < K; ++k) {
+				if (clusters[k].Count() == 0) {
+					continue;
+				}
+				auto dist = Dist(clusters[k], x[i]);
 				if (dist < min_dist) {
 					min_dist = dist;
-					new_label_index = j;
+					new_label_index = k;
 				}
 			}
 			auto new_label = clusters[new_label_index].label;
@@ -113,20 +118,31 @@ private:
 			clusters[i].Mean();
 		}
 
+		auto cluster_count = 0;
+		for (auto i = 0; i < K; ++i) {
+			if (clusters[i].Count() > 0) {
+				++cluster_count;
+			}
+		}
+
+		if (iteration == 0) {
+			cluster_changed = ROWS;
+		}
+
 		if (verbose) {
-			std::cout << "#### " << iteration << " iteration: " << cluster_changed << "/" << max_cluster_changed << " vectors cluster changed" << std::endl;
+			std::cout << "#### " << iteration << " iteration: " << cluster_count << " clusters: " << cluster_changed << "/" << max_cluster_changed << " vectors cluster changed" << std::endl;
 			for (auto i = 0; i < K; ++i) {
 				if (clusters[i].Count() == 0) {
 					continue;
 				}
-				std::cout << clusters[i].label << '\t' << clusters[i].Count() << std::endl;
+				// std::cout << clusters[i].label << '\t' << clusters[i].Count() << std::endl;
 			}
 		}
 	}
 
 private:
-	int K;
 	const int ROWS;
+	const int K;
 	DataSet& x;
 	Clusters& clusters;
 	int iteration;
